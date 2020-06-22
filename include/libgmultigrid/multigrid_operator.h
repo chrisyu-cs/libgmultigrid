@@ -36,14 +36,6 @@ namespace LWS {
         public:
         MultigridOperator() {}
         virtual ~MultigridOperator() {}
-
-        int lowerSize;
-        int upperSize;
-        NullSpaceProjector* lowerP;
-        NullSpaceProjector* upperP;
-        
-        std::vector<IndexedMatrix> matrices;
-        std::vector<IndexedMatrix> edgeMatrices;
         
         virtual Eigen::VectorXd prolong(Eigen::VectorXd v) = 0;
         virtual Eigen::VectorXd restrictWithTranspose(Eigen::VectorXd v) = 0;
