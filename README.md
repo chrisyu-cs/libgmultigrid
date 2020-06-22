@@ -72,9 +72,9 @@ Of course, for efficiency reasons, one would want to write a more complex multip
 Next, you need to implement a class that extends `MultigridOperator` (in `multigrid_operator.h`). This will serve as the prolongation operator, which is what maps data between the different levels of the multigrid hierarchy. `MultigridOperator` has three virtual methods:
 
 ```
-    virtual Eigen::VectorXd prolong(Eigen::VectorXd v) = 0;
-    virtual Eigen::VectorXd restrictWithTranspose(Eigen::VectorXd v) = 0;
-    virtual Eigen::VectorXd restrictWithPinv(Eigen::VectorXd v) = 0;
+virtual Eigen::VectorXd prolong(Eigen::VectorXd v) = 0;
+virtual Eigen::VectorXd restrictWithTranspose(Eigen::VectorXd v) = 0;
+virtual Eigen::VectorXd restrictWithPinv(Eigen::VectorXd v) = 0;
 ```
 
 Intuitively, the prolongation operator is a sparse matrix `J` of size N x M, where N is the size of the finer level, and M is the size of the coarser level; multiplying by the matrix then maps data from the coarse level to the fine level. The entries of this matrix represent some sort of interpolation of the data from the coarse grid onto the cells of the fine grid. For instance, if the multigrid hierarchy was constructed by subdivision of triangle meshes, then `J` should be the subdivision matrix at each level.
@@ -87,49 +87,80 @@ It's advisable to give your implementation of this class a constructor with no a
 
 ### 3. Implement the multigrid domain
 
-The class `MultigridDomain` defines an interface with several operations relating to the geometric domain (e.g. a square grid, a space curve, a triangle mesh, etc.). You will have to implement a class that extends `MultigridDomain<Mult, Operator>`, where you use the classes that you implemented in the previous 2 steps as the arguments `Mult` and `Operator`.
+The class `MultigridDomain` defines an interface with several operations relating to the geometric domain (e.g. a square grid, a space curve, a triangle mesh, etc.). You will have to implement a class that extends `MultigridDomain<Mult, Operator>`, where you use the classes that you implemented in the previous 2 steps as the arguments `Mult` and `Operator`. So, for instance, a class declaration might look like:
+```
+class ConstraintProjectorDomain : public MultigridDomain<BlockClusterTree, MatrixProjectorOperator> {
+    ...
+}
+```
+Here, `BlockClusterTree` and `MatrixProjectorOperator` are two classes corresponding to the two above steps, and we extend the specific template instantiation using these two classes.
 
-This class has seven virtual functions to implement:
+#### Interface
+
+Your class will have seven virtual functions to implement:
 
 ```
-    virtual MultigridDomain<Mult, Operator>* Coarsen(Operator* prolongOp) const = 0;
+virtual MultigridDomain<Mult, Operator>* Coarsen(Operator* prolongOp) const = 0;
 ```
 This applies one level of coarsening to the current domain and returns the result. For instance, on a space curve, this might create a coarser curve by deleting every other vertex. When this function finishes, the argument `prolongOp` should contain all the data necessary to perform prolongation and restriction between the fine domain and the coarse domain.
 
 
 ```
-    virtual Mult* GetMultiplier() const = 0;
+virtual Mult* GetMultiplier() const = 0;
 ```
 
 This returns the matrix-vector product associated with the current domain; it should just be a one-liner that returns the appropriate field.
 
 ```
-    virtual Eigen::MatrixXd GetFullMatrix() const = 0;
+virtual Eigen::MatrixXd GetFullMatrix() const = 0;
 ```
 This should construct and return the full left-hand side matrix `A` (in the system `Ax = b` that you want to solve) from the current geometric domain.
 
 
 ```
-    virtual Eigen::VectorXd DirectSolve(Eigen::VectorXd &b) const = 0;
+virtual Eigen::VectorXd DirectSolve(Eigen::VectorXd &b) const = 0;
 ```
 This should get the matrix `A` using `GetFullMatrix()` and then solve `Ax = b` using a direct method.
 
 ```
-    virtual int NumVertices() const = 0;
+virtual int NumVertices() const = 0;
 ```
 This should return the number of vertices (or in general the number of elements) in the current domain.
 
 ```
-    virtual int NumRows() const  = 0;
+virtual int NumRows() const  = 0;
 ```
 This should return the number of rows in the system `Ax = b` on the current domain. This is not necessarily the same as `NumVertices()`. For instance, each vertex might have an associated 3-vector instead of just one value, making a `3V x 3V` system. Or, if there are explicit constraint rows, then these also need to be accounted for.
 
 ```
-    virtual Operator* MakeNewOperator() const = 0;
+virtual Operator* MakeNewOperator() const = 0;
 ```
 This should just construct and return a new `Operator`, which most likely is just `return new Foo()` with the operator class you defined previously.
 
+### 4. Create a hierarchy and solve
 
+All that's left to do is write the code that uses the above components to perform the actual linear solve. This code will look something like:
+
+```
+using Domain = YourDomain;
+using Solver = MultigridHierarchy<Domain>;
+
+// Get the right-hand side of the system.
+Eigen::VectorXd b = getYourData( ... );
+
+// Set up your initial domain -- the solver will automatically
+// create the rest of the hierarchy.
+Domain* domain = new Domain( ... );
+
+// Create a solver using your initial domain.
+Solver* multigrid = new Solver(domain);
+
+// Pick a tolerance for the multigrid solve.
+double tol = 0.001;
+
+// Solve the system.
+Eigen::VectorXd x = solver->solver->template VCycleSolve<Smoother>(b, tol);
+```
 
 
 
