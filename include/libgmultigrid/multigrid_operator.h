@@ -6,11 +6,6 @@
 #include "nullspace_projector.h"
 
 namespace LWS {
-    struct IndexedMatrix {
-        Eigen::SparseMatrix<double> M;
-        int fineOffset;
-        int coarseOffset;
-    };
     
     template<typename V>
     V ApplyPinv(Eigen::SparseMatrix<double> &J, V &x) {

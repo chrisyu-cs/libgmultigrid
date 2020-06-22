@@ -20,6 +20,5 @@ namespace LWS {
         virtual int NumVertices() const = 0;
         virtual int NumRows() const  = 0;
         virtual Operator* MakeNewOperator() const = 0;
-        virtual NullSpaceProjector* GetConstraintProjector() const = 0;
     };
 }
