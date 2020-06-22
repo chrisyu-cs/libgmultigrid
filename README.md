@@ -1,5 +1,5 @@
 # libgmultigrid
-A header-only library for geometric multigrid.
+A header-only library for V-cycles in geometric multigrid. 
 
 ## Installation
 
